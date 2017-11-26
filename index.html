@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Permanent+Marker" rel="stylesheet">
+    <script
+    src="https://code.jquery.com/jquery-1.12.4.min.js"
+    integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ="
+    crossorigin="anonymous"></script>
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body, .wrapper, .bg {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      .wrapper{
+        position: relative;
+        text-align: center;
+      }
+      .bg{
+        width: 100%;
+        background-color: #333;
+        opacity: .8;
+        z-index: 5;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      .search{
+        width: 50%;
+        height: 25%;
+        z-index: 10;
+        position:absolute;
+        left:0;
+        top:0;
+        right:0;
+        bottom:0;
+        margin:auto;
+      }
+      .search h1{
+        font-family: 'Permanent Marker', cursive;
+        /*color: #FDFDFB;*/
+        color: #ccc;
+        font-size: 41px;
+        font-weight: 100;
+        text-shadow: -1px -1px 0 white, 1px 1px 0 #333,1px 1px 0 #444;
+      }
+      .searchInput{
+        width: 65%;
+        height: 36px;
+        font-size: 17px;
+        padding: 0 5px;
+      }
+      .searchBtn{
+        height: 40px;
+        width: 60px;
+        font-size: 17px;
+        padding: 0 5px;
+      }
+      .searchIcon{
+        width: 50px;
+        height: 50px;
+        background-color: #fff;
+        border-radius: 50%;
+        display: none;
+        position: absolute;
+        left: 30px;
+        bottom: 30px;
+        padding: 12.5px;
+        z-index: 15;
+        cursor: pointer;
+      }
+      .searchIcon:hover {
+        background-color: #000;
+      }
+      ul{
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        overflow: auto;
+      }
+      ul li{
+        color: #fff;
+        display: block;
+        float: left;
+        height: 50px;
+        margin: 0 20px 0 0;
+      }
+      ul li label{
+        font-weight: 300;
+        font-size: 20px;
+        height: 30px;
+        line-height: 50px;
+        z-index: 9;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div id="map"></div>
+      <div class="bg"></div>
+      <div id="searchBox" class="search">
+        <h1>Search for YouBike location in New Taipei City</h1>
+        <form>
+          <input type="text" placeholder="請輸入新北市行政區搜尋，ex.板橋" id="address" class="searchInput">
+          <input type="button" value="搜尋" id="submit" class="searchBtn" disabled>
+          <ul>
+            <li>
+              <input type="radio" name="type" value="bus" id="radio_wifi">
+              <label for="radio_wifi">Free New Taipei wifi</label>
+            </li>
+            <li>
+              <input type="radio" name="type" value="youbike" id="radio_youbike">
+              <label for="radio_youbike">YouBike</label>
+            </li>
+            <li>
+              <input type="radio" name="type" value="youbike" id="radio_gas">
+              <label for="radio_gas">GAS station</label>
+            </li>
+            <!-- <li>
+              <input type="radio" name="type" value="youbike" id="radio_garbage">
+              <label for="radio_garbage">Garbage station</label>
+            </li> -->
+          </ul>
+        </form>
+      </div>
+      <div id="searchIcon" class="searchIcon">
+        <svg width='100%' height='100%' fill="#000000" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" x="0px" y="0px" viewBox="0 0 60 60" style="enable-background:new 0 0 60 60;" xml:space="preserve">
+          <path d="M57,52.7L46.8,42.5c3.5-4.5,5.4-9.9,5.4-15.4c0-13.8-11.2-25-25-25s-25,11.2-25,25s11.2,25,25,25c5.6,0,11.1-1.9,15.4-5.4  l10.2,10.2c0.6,0.6,1.3,0.9,2.1,0.9s1.5-0.3,2.1-0.9C58.2,55.7,58.2,53.9,57,52.7z M46.2,27.2c0,10.5-8.5,19-19,19s-19-8.5-19-19  c0-10.5,8.5-19,19-19S46.2,16.7,46.2,27.2z"/>
+        </svg>
+      </div>
+    </div>
+    <script>
+      var locations = [];
+      var contentString = [];
+
+      var source = [];
+      var sourceWifi = [];
+      var sourceGas = [];
+      var sourceGarbage = [];
+
+      var val = '';
+      
+      // youbike data
+      function addLocations() {
+        return $.ajax({
+            url: "//json2jsonp.com/?url=http%3A%2F%2Fdata.ntpc.gov.tw%2Fod%2Fdata%2Fapi%2F54DDDC93-589C-4858-9C95-18B2046CC1FC%3F%24format%3Djson",
+            dataType: "jsonp",
+            success: function(data) {
+              source = data;
+              console.log('11111');
+            }
+        });
+      };
+      // wifi data
+      function addWifiLocations() {
+        return $.ajax({
+            url: "//json2jsonp.com/?url=http%3a%2f%2fdata.ntpc.gov.tw%2fod%2fdata%2fapi%2f04958686-1B92-4B74-889D-9F34409B272B%3f%24format%3djson",
+            dataType: "jsonp",
+            success: function(data) {
+              sourceWifi = data;
+              console.log('22222');
+            }
+        });
+      };
+      // gas data
+      function addGasLocations() {
+        return $.ajax({
+            url: "//json2jsonp.com/?url=http%3a%2f%2fdata.ntpc.gov.tw%2fod%2fdata%2fapi%2f112F981A-0F10-4791-8F10-67FBDA1D3A83%3f%24format%3djson",
+            dataType: "jsonp",
+            success: function(data) {
+              sourceGas = data;
+              console.log('33333');
+            }
+        });
+      };
+      // garbage data
+      // function addGarbageLocations() {
+      //   return $.ajax({
+      //       url: "//json2jsonp.com/?url=http%3a%2f%2fdata.ntpc.gov.tw%2fod%2fdata%2fapi%2fEDC3AD26-8AE7-4916-A00B-BC6048D19BF8%3f%24format%3djson",
+      //       dataType: "jsonp",
+      //       success: function(data) {
+      //         sourceGarbage = data;
+      //         console.log('44444');
+      //       }
+      //   });
+      // };
+      // finish get data
+      $.when(addLocations(), addWifiLocations(), addGasLocations()).done(function(){
+          $("#submit").prop('disabled', false);
+      });
+
+      $("#address").keyup(function(event) {val = $(this).val()});
+
+      $("input:radio").on('click', function() {
+        if (document.getElementById('radio_youbike').checked) {
+          // youbike data
+          if (val) {
+            locations = [];
+            contentString = [];
+            var show = source.filter(function(a) {return a.sarea.indexOf(val) > -1;});
+            for (var i = 0, len = show.length ; i < len; i++) {
+              var sourceLAT = parseFloat(show[i].lat);
+              var sourceLNG = parseFloat(show[i].lng);
+              locations.push({lat: sourceLAT, lng: sourceLNG});
+
+              sourceContent = '<div id="content">'+
+              '<div id="siteNotice">'+
+              '</div>'+
+              '<h3 id="firstHeading" class="firstHeading">'+show[i].sna+'</h3>'+
+              '<div id="bodyContent">'+
+              '<p>'+show[i].ar+'</p>'+
+              '</div>'+
+              '</div>';
+              contentString.push(sourceContent);
+            }
+          }
+        } else if (document.getElementById('radio_wifi').checked) {
+          // wifi data
+          if (val) {
+            locations = [];
+            contentString = [];
+            var show = sourceWifi.filter(function(a) {return a.district.indexOf(val) > -1;});
+            
+            function getIndex(x){return show[x].address.indexOf("樓")};
+            function getAddress(x){return show[x].address.slice(0, getIndex(x)-1)};
+            function checkArray(arr, val) {
+              return arr.some(function(arrVal) {
+                var _index = arrVal.address.indexOf("樓");
+                var _arrVal = arrVal.address.slice(0, _index-1);
+                return val === _arrVal;
+              });
+            }
+            
+            
+            for (var i = 0, len = show.length ; i < len; i++) {
+              
+              var sourceLAT = parseFloat(show[i].latitude);
+              var sourceLNG = parseFloat(show[i].longitude);
+              // locations.push({lat: sourceLAT, lng: sourceLNG});
+
+              if (i == 0) {
+                locations.push({lat: sourceLAT, lng: sourceLNG});
+              } else {
+                if (checkArray(show.slice(1, i), getAddress(i))) {
+                  continue;
+                } else {
+                  locations.push({lat: sourceLAT, lng: sourceLNG});
+                }
+              }
+              
+              sourceContent = '<div id="content">'+
+              '<div id="siteNotice">'+
+              '</div>'+
+              '<h3 id="firstHeading" class="firstHeading">'+show[i].spot_name+'</h3>'+
+              '<div id="bodyContent">'+
+              '<p>'+show[i].address+'</p>'+
+              '</div>'+
+              '</div>';
+              contentString.push(sourceContent);
+            }
+          }
+          // console.log('locationsArray02 === ',locations);
+          // console.log('contentArray02  === ',contentString);
+        } else if (document.getElementById('radio_gas').checked) {
+          // gas data
+          if (val) {
+            locations = [];
+            contentString = [];
+            var show = sourceGas.filter(function(a) {return a.address.indexOf(val) > -1;});
+            for (var i = 0, len = show.length ; i < len; i++) {
+              var sourceLAT = parseFloat(show[i].wgs84aY);
+              var sourceLNG = parseFloat(show[i].wgs84aX);
+              locations.push({lat: sourceLAT, lng: sourceLNG});
+
+              sourceContent = '<div id="content">'+
+              '<div id="siteNotice">'+
+              '</div>'+
+              '<h3 id="firstHeading" class="firstHeading">'+show[i].station+'</h3>'+
+              '<div id="bodyContent">'+
+              '<p>'+show[i].address+'</p>'+
+              '</div>'+
+              '</div>';
+              contentString.push(sourceContent);
+            }
+          }
+        } else if (document.getElementById('radio_garbage').checked) {
+          // Garbage data
+          if (val) {
+            locations = [];
+            contentString = [];
+            var show = sourceGarbage.filter(function(a) {return a.city.indexOf(val) > -1;});
+            for (var i = 0, len = show.length ; i < len; i++) {
+              var sourceLAT = parseFloat(show[i].latitude);
+              var sourceLNG = parseFloat(show[i].longitude);
+              locations.push({lat: sourceLAT, lng: sourceLNG});
+
+              sourceContent = '<div id="content">'+
+              '<div id="siteNotice">'+
+              '</div>'+
+              '<h3 id="firstHeading" class="firstHeading">'+show[i].name+'</h3>'+
+              '<div id="bodyContent">'+
+              '<p>time : '+show[i].time+'</p>'+
+              '</div>'+
+              '</div>';
+              contentString.push(sourceContent);
+            }
+          }
+        }
+      });
+
+      var markers = [];
+      var map;
+      var infowindow = null;
+      
+      function initMap() {
+
+        // *** map style
+        map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 12,
+          center: {lat: 25.014398, lng: 121.463526},
+          styles: [
+            {elementType: 'geometry', stylers: [{color: '#242f3e'}]},
+            {elementType: 'labels.text.stroke', stylers: [{color: '#242f3e'}]},
+            {elementType: 'labels.text.fill', stylers: [{color: '#746855'}]},
+            {
+              featureType: 'administrative.locality',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#d59563'}]
+            },
+            {
+              featureType: 'poi',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#d59563'}]
+            },
+            {
+              featureType: 'poi.park',
+              elementType: 'geometry',
+              stylers: [{color: '#263c3f'}]
+            },
+            {
+              featureType: 'poi.park',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#6b9a76'}]
+            },
+            {
+              featureType: 'road',
+              elementType: 'geometry',
+              stylers: [{color: '#38414e'}]
+            },
+            {
+              featureType: 'road',
+              elementType: 'geometry.stroke',
+              stylers: [{color: '#212a37'}]
+            },
+            {
+              featureType: 'road',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#9ca5b3'}]
+            },
+            {
+              featureType: 'road.highway',
+              elementType: 'geometry',
+              stylers: [{color: '#746855'}]
+            },
+            {
+              featureType: 'road.highway',
+              elementType: 'geometry.stroke',
+              stylers: [{color: '#1f2835'}]
+            },
+            {
+              featureType: 'road.highway',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#f3d19c'}]
+            },
+            {
+              featureType: 'transit',
+              elementType: 'geometry',
+              stylers: [{color: '#2f3948'}]
+            },
+            {
+              featureType: 'transit.station',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#d59563'}]
+            },
+            {
+              featureType: 'water',
+              elementType: 'geometry',
+              stylers: [{color: '#17263c'}]
+            },
+            {
+              featureType: 'water',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#515c6d'}]
+            },
+            {
+              featureType: 'water',
+              elementType: 'labels.text.stroke',
+              stylers: [{color: '#17263c'}]
+            }
+          ]
+        });
+
+        // ***Add search fun
+        var geocoder = new google.maps.Geocoder();
+
+        document.getElementById('submit').addEventListener('click', function() {
+          $( "#searchBox,.bg" ).fadeOut( "slow" );
+
+          geocodeAddress(geocoder, map);
+
+          drop();
+
+          map.setZoom(15);
+
+          $( "#searchIcon" ).show().hover(function() {
+            $( "#searchIcon svg" ).attr("fill", "#fff");
+          }, function() {
+            $( "#searchIcon svg" ).attr("fill", "#000");
+          });
+        });
+
+        document.getElementById('searchIcon').addEventListener('click', function() {
+          $( "#searchBox,.bg" ).fadeIn( "slow" );
+          $( "#searchIcon" ).hide();
+          $('#address').val('');
+          clearMarkers();
+        });
+      }
+
+      // ***Add ubike positions
+      function drop() {
+        clearMarkers();
+        for (var i = 0, loclen = locations.length ; i < loclen; i++) {
+          addMarkerWithTimeout(locations[i], contentString[i], i * 200);
+        }
+      }
+
+      function addMarkerWithTimeout(position, contentS, timeout) {
+        window.setTimeout(function() {
+          
+          if (document.getElementById('radio_youbike').checked) {
+            var markerP = new google.maps.Marker({
+              position: position,
+              map: map,
+              animation: google.maps.Animation.DROP,
+              icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+            });
+          } else if (document.getElementById('radio_wifi').checked) {
+            var markerP = new google.maps.Marker({
+              position: position,
+              map: map,
+              animation: google.maps.Animation.DROP,
+              icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+            });
+          } else if (document.getElementById('radio_gas').checked) {
+            var markerP = new google.maps.Marker({
+              position: position,
+              map: map,
+              animation: google.maps.Animation.DROP,
+              icon: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
+            });
+          } else if (document.getElementById('radio_garbage').checked){
+            var markerP = new google.maps.Marker({
+              position: position,
+              map: map,
+              animation: google.maps.Animation.DROP,
+              icon: 'http://maps.google.com/mapfiles/ms/icons/orange-dot.png'
+            });
+          };
+
+          // infowindow = new google.maps.InfoWindow({
+          //   content: contentS
+          // });
+
+          google.maps.event.addListener(markerP, 'click', function() {
+            if (infowindow) {
+              infowindow.close();
+            }
+            infowindow = new google.maps.InfoWindow({
+              content: contentS
+            });
+            infowindow.open(map, markerP);
+          });
+
+          markers.push(markerP);
+
+        }, timeout);
+      }
+
+      function clearMarkers() {
+        for (var i = 0, mlen = markers.length; i < mlen; i++) {
+          markers[i].setMap(null);
+        }
+        markers = [];
+      }
+
+      // ***Add search fun
+      function geocodeAddress(geocoder, resultsMap) {
+        var address = document.getElementById('address').value;
+        geocoder.geocode({'address': address}, function(results, status) {
+          if (status === 'OK') {
+            resultsMap.setCenter(results[0].geometry.location);
+            var marker = new google.maps.Marker({
+              map: resultsMap,
+              position: results[0].geometry.location
+            });
+          } else {
+            alert('Geocode was not successful for the following reason: ' + status);
+          }
+        });
+      }
+
+      // $( "#searchIcon" ).mouseenter(
+      //   $( "#searchIcon svg" ).attr("fill", "#000");
+      // );
+    </script>
+    <!-- 新增標記群集程式庫 -->
+    <script src="https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/markerclusterer.js">
+    </script>
+    <!-- google api key -->
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4RO90HKJaTL1sJT1L0He-4dnxs71_mPs&callback=initMap">
+    </script>
+  </body>
+</html>
